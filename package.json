@@ -1,0 +1,46 @@
+{
+  "name": "obs-ls-headless",
+  "version": "0.1.0",
+  "description": "Headless Obsidian LiveSync client for server-side note synchronization",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "debug-sync": "tsx src/debug-sync.ts",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "obsidian",
+    "livesync",
+    "couchdb",
+    "sync",
+    "notes"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/cors": "^11",
+    "dotenv": "^17",
+    "fastify": "^5",
+    "nano": "^11",
+    "octagonal-wheels": "^0.1.44",
+    "pino": "^10",
+    "pino-pretty": "^13"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
+    "eslint": "^9",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4"
+  }
+}

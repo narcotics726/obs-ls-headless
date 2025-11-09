@@ -1,0 +1,235 @@
+import { CouchDBClient } from '../core/couchdb-client.js';
+import { ChunkAssembler } from '../core/chunk-assembler.js';
+import { IDocumentAssembler } from '../core/interfaces.js';
+import { SyncStatus, LiveSyncDocument, Note } from '../types/index.js';
+import logger from '../utils/logger.js';
+
+/**
+ * Service for managing synchronization with CouchDB
+ * Uses IDocumentAssembler for flexible document assembly strategies
+ */
+export class SyncService {
+  private client: CouchDBClient;
+  private assembler: IDocumentAssembler;
+  private status: SyncStatus;
+  private syncInterval?: NodeJS.Timeout;
+  private notes: Map<string, Note> = new Map();
+
+  constructor(client: CouchDBClient, passphrase?: string) {
+    this.client = client;
+    // Use ChunkAssembler as default implementation
+    // Can be swapped with other implementations (e.g., DirectFileManipulator wrapper)
+    this.assembler = new ChunkAssembler(client, passphrase);
+    this.status = {
+      isRunning: false,
+      lastSyncTime: null,
+      lastSyncSuccess: false,
+      documentsCount: 0,
+    };
+  }
+
+  /**
+   * Set a custom document assembler implementation
+   * Allows switching between different assembly strategies
+   */
+  setAssembler(assembler: IDocumentAssembler): void {
+    this.assembler = assembler;
+    logger.info('Document assembler implementation changed');
+  }
+
+  /**
+   * Start automatic synchronization
+   */
+  startAutoSync(intervalMs: number): void {
+    if (this.syncInterval) {
+      logger.warn('Auto-sync already running');
+      return;
+    }
+
+    logger.info({ intervalMs }, 'Starting auto-sync');
+    this.syncInterval = setInterval(() => {
+      this.sync().catch((error) => {
+        logger.error({ error }, 'Auto-sync failed');
+      });
+    }, intervalMs);
+
+    // Run initial sync
+    this.sync().catch((error) => {
+      logger.error({ error }, 'Initial sync failed');
+    });
+  }
+
+  /**
+   * Stop automatic synchronization
+   */
+  stopAutoSync(): void {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = undefined;
+      logger.info('Auto-sync stopped');
+    }
+  }
+
+  /**
+   * Perform a single synchronization
+   */
+  async sync(): Promise<void> {
+    if (this.status.isRunning) {
+      logger.warn('Sync already in progress');
+      return;
+    }
+
+    this.status.isRunning = true;
+    logger.info('Starting sync');
+
+    try {
+      const documents = await this.client.getAllDocuments();
+      await this.processDocuments(documents);
+
+      this.status.lastSyncTime = new Date();
+      this.status.lastSyncSuccess = true;
+      this.status.documentsCount = documents.length;
+      delete this.status.error;
+
+      logger.info(
+        { count: documents.length, notesCount: this.notes.size },
+        'Sync completed successfully'
+      );
+    } catch (error: any) {
+      this.status.lastSyncSuccess = false;
+      this.status.error = error.message;
+      logger.error({ error }, 'Sync failed');
+      throw error;
+    } finally {
+      this.status.isRunning = false;
+    }
+  }
+
+  /**
+   * Process LiveSync documents and convert to notes
+   *
+   * Filtering logic based on livesync-bridge:
+   * 1. Skip chunk documents (h:, h:+) - these are assembled by ChunkAssembler
+   * 2. Skip other internal documents (ps:, ix:, etc.)
+   * 3. Skip deleted documents
+   * 4. Process metadata documents (type="newnote" or "plain")
+   */
+  private async processDocuments(documents: LiveSyncDocument[]): Promise<void> {
+    let processedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+
+    for (const doc of documents) {
+      logger.debug({ docId: doc._id, docType: doc.type, docPath: doc.path }, 'Processing document');
+
+      // Skip chunk documents - these are internal storage
+      if (doc._id.startsWith('h:') || doc._id.startsWith('h:+')) {
+        logger.debug({ docId: doc._id }, 'Skipping chunk document');
+        skippedCount++;
+        continue;
+      }
+
+      // Skip other internal documents (ps:, ix:, leaf:, etc.)
+      if (doc._id.includes(':')) {
+        logger.debug({ docId: doc._id }, 'Skipping internal document (contains ":")');
+        skippedCount++;
+        continue;
+      }
+
+      // Skip deleted documents
+      if (doc.deleted || doc._deleted) {
+        logger.debug({ docId: doc._id }, 'Skipping deleted document');
+        skippedCount++;
+        continue;
+      }
+
+      // Check for required fields
+      if (!doc.path) {
+        logger.warn({ docId: doc._id }, 'Document missing path field');
+        skippedCount++;
+        continue;
+      }
+
+      // Check document type
+      if (!doc.type) {
+        logger.warn({ docId: doc._id, path: doc.path }, 'Document missing type field');
+        skippedCount++;
+        continue;
+      }
+
+      if (doc.type !== 'newnote' && doc.type !== 'plain') {
+        logger.debug({ docId: doc._id, path: doc.path, type: doc.type }, 'Skipping non-note document type');
+        skippedCount++;
+        continue;
+      }
+
+      try {
+        // Use assembler to get document content
+        // This handles direct data, children chunks, and eden cache
+        const content = await this.assembler.assembleDocument(doc);
+
+        if (content === null) {
+          logger.warn({ docId: doc._id, path: doc.path }, 'Failed to assemble document content');
+          errorCount++;
+          continue;
+        }
+
+        const note: Note = {
+          id: doc._id,
+          path: doc.path,
+          content,
+          mtime: doc.mtime ? new Date(doc.mtime) : new Date(),
+          ctime: doc.ctime ? new Date(doc.ctime) : new Date(),
+          size: doc.size || 0,
+        };
+
+        this.notes.set(doc._id, note);
+        processedCount++;
+        logger.debug({ docId: doc._id, path: doc.path, contentLength: content.length }, 'Note processed successfully');
+      } catch (error: any) {
+        errorCount++;
+        logger.error({ error: error.message, docId: doc._id, path: doc.path }, 'Failed to process document');
+      }
+    }
+
+    logger.info({
+      total: documents.length,
+      processed: processedCount,
+      skipped: skippedCount,
+      errors: errorCount
+    }, 'Document processing summary');
+  }
+
+  /**
+   * Get current sync status
+   */
+  getStatus(): SyncStatus {
+    return { ...this.status };
+  }
+
+  /**
+   * Get all synchronized notes
+   */
+  getNotes(): Note[] {
+    return Array.from(this.notes.values());
+  }
+
+  /**
+   * Get a specific note by ID
+   */
+  getNote(id: string): Note | undefined {
+    return this.notes.get(id);
+  }
+
+  /**
+   * Search notes by path or content
+   */
+  searchNotes(query: string): Note[] {
+    const lowerQuery = query.toLowerCase();
+    return Array.from(this.notes.values()).filter(
+      (note) =>
+        note.path.toLowerCase().includes(lowerQuery) ||
+        note.content.toLowerCase().includes(lowerQuery)
+    );
+  }
+}
