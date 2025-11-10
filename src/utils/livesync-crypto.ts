@@ -16,7 +16,7 @@ const HKDF_PREFIX = '%=';
  * LiveSync crypto utility for decrypting HKDF-encrypted chunks
  */
 export class LiveSyncCrypto {
-  private pbkdf2Salt?: Uint8Array;
+  private pbkdf2Salt?: Uint8Array<ArrayBuffer>;
 
   constructor(
     private storage: IDocumentStorage,
@@ -27,7 +27,7 @@ export class LiveSyncCrypto {
    * Get PBKDF2 salt from sync parameters document
    * The salt is cached after first retrieval
    */
-  private async getPBKDF2Salt(): Promise<Uint8Array> {
+  private async getPBKDF2Salt(): Promise<Uint8Array<ArrayBuffer>> {
     if (this.pbkdf2Salt) {
       return this.pbkdf2Salt;
     }
@@ -59,9 +59,8 @@ export class LiveSyncCrypto {
         throw new Error('pbkdf2salt not found in sync parameters document');
       }
 
-      this.pbkdf2Salt = new Uint8Array(
-        Buffer.from(saltBase64, 'base64')
-      );
+      const buffer = Buffer.from(saltBase64, 'base64');
+      this.pbkdf2Salt = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
       logger.info({
         saltLength: this.pbkdf2Salt.length,
