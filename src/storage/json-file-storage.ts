@@ -23,27 +23,71 @@ export class JsonFileStorage implements IStateStorage {
   }
 
   async initialize(): Promise<void> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    try {
+      // Ensure base directory exists
+      await fs.mkdir(this.baseDir, { recursive: true });
+      logger.debug({ baseDir: this.baseDir }, 'Storage initialized');
+    } catch (error) {
+      logger.error({ error, baseDir: this.baseDir }, 'Failed to initialize storage');
+      throw error;
+    }
   }
 
   async getState(): Promise<SyncState> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    const filePath = this.getFilePath();
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const state = JSON.parse(content) as SyncState;
+      logger.debug({ filePath, state }, 'State loaded successfully');
+      return state;
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, return empty state
+        logger.debug({ filePath }, 'State file not found, returning empty state');
+        return {};
+      }
+      logger.error({ error, filePath }, 'Failed to load state');
+      throw error;
+    }
   }
 
   async saveState(state: SyncState): Promise<void> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    const filePath = this.getFilePath();
+    try {
+      // Ensure directory exists
+      await fs.mkdir(this.baseDir, { recursive: true });
+
+      // Write state to file
+      const json = JSON.stringify(state, null, 2);
+      await fs.writeFile(filePath, json, 'utf-8');
+
+      logger.debug({ filePath, state }, 'State saved successfully');
+    } catch (error) {
+      logger.error({ error, filePath }, 'Failed to save state');
+      throw error;
+    }
   }
 
   async updateState(partial: Partial<SyncState>): Promise<void> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    const currentState = await this.getState();
+    const newState = { ...currentState, ...partial };
+    await this.saveState(newState);
+    logger.debug({ partial, newState }, 'State updated');
   }
 
   async resetState(): Promise<void> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    const filePath = this.getFilePath();
+    try {
+      await fs.unlink(filePath);
+      logger.debug({ filePath }, 'State reset (file deleted)');
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, nothing to reset
+        logger.debug({ filePath }, 'State file not found, nothing to reset');
+        return;
+      }
+      logger.error({ error, filePath }, 'Failed to reset state');
+      throw error;
+    }
   }
 }
