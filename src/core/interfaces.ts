@@ -45,6 +45,46 @@ export interface IDocumentStorage {
 }
 
 /**
+ * Sync state that needs to be persisted
+ */
+export interface SyncState {
+  lastSeq?: string;      // CouchDB sequence number for incremental sync
+  lastSyncTime?: string; // ISO 8601 timestamp of last successful sync
+}
+
+/**
+ * Interface for state persistence
+ * Current implementation: JsonFileStorage
+ * Future implementations: SQLiteStorage, PostgreSQLStorage
+ */
+export interface IStateStorage {
+  /**
+   * Initialize storage (create file if needed)
+   */
+  initialize(): Promise<void>;
+
+  /**
+   * Get current sync state
+   */
+  getState(): Promise<SyncState>;
+
+  /**
+   * Save complete sync state
+   */
+  saveState(state: SyncState): Promise<void>;
+
+  /**
+   * Update partial state (merge with existing)
+   */
+  updateState(partial: Partial<SyncState>): Promise<void>;
+
+  /**
+   * Reset state (clear lastSeq for forced full sync)
+   */
+  resetState(): Promise<void>;
+}
+
+/**
  * Result of document assembly with metadata
  */
 export interface AssembledDocument {

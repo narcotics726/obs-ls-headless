@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Tools
+
+Always use the Context7 MCP tools to resolve library id and get library docs without me having to explicitly ask.
+Always use the Serena MCP tools (like find_symbol, find_referencing_symbols and insert_after_symbol) when trying to locate or modify code in this repository.
+
+
+## Communication
+Always communicate in Chinese, but write code comments and documentation in English.
+
+When modifying code, do it in small, incremental steps. After each step, explain what you changed and why.
+When adding new files, only add skeleton codes (e.g. empty classes/functions with comments) first, then fill in the implementation in subsequent steps.
+
+Between each step, explain, discuss, and get confirmation before proceeding to the next step.
+
 ## Project Overview
 
 obs-ls-headless is a headless Obsidian LiveSync client that runs on servers to synchronize notes from CouchDB. It provides a REST API for managing sync operations and querying notes, with planned AI analysis features.
@@ -252,8 +266,9 @@ When writing tests:
 
 ## Dependencies
 
+Use `pnpm` to manage dependencies, run tasks and scripts.
+
 - **octagonal-wheels**: Official LiveSync encryption library (HKDF, PBKDF2)
 - **nano**: CouchDB client for Node.js
 - **fastify**: Fast web framework for REST API
 - **pino**: High-performance logging
-- 项目使用 pnpm 管理依赖
