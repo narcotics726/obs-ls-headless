@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { loadConfig } from './utils/config.js';
 import { CouchDBClient } from './core/couchdb-client.js';
 import { SyncService } from './services/sync-service.js';
+import { JsonFileStorage } from './storage/json-file-storage.js';
 import { registerRoutes } from './api/routes.js';
 import logger from './utils/logger.js';
 
@@ -20,8 +21,17 @@ async function main() {
     process.exit(1);
   }
 
+  // Initialize state storage
+  const stateStorage = new JsonFileStorage();
+  await stateStorage.initialize();
+
   // Initialize sync service
-  const syncService = new SyncService(couchdbClient, config.couchdb.passphrase);
+  const syncService = new SyncService(
+    couchdbClient,
+    stateStorage,
+    config.couchdb.passphrase
+  );
+  await syncService.initialize();
 
   // Start auto-sync if enabled
   if (config.sync.autoSyncEnabled) {

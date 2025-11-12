@@ -29,6 +29,7 @@ export interface SyncStatus {
   lastSyncTime: Date | null;
   lastSyncSuccess: boolean;
   documentsCount: number;
+  lastSeq?: string;  // CouchDB sequence number for incremental sync
   error?: string;
 }
 

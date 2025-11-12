@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SyncService } from './sync-service.js';
 import { CouchDBClient } from '../core/couchdb-client.js';
-import type { IDocumentAssembler } from '../core/interfaces.js';
+import type { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
 import type { LiveSyncDocument } from '../types/index.js';
 
 describe('SyncService', () => {
   let mockClient: CouchDBClient;
   let mockAssembler: IDocumentAssembler;
+  let mockStateStorage: IStateStorage;
   let syncService: SyncService;
 
   beforeEach(() => {
@@ -15,11 +16,24 @@ describe('SyncService', () => {
       getAllDocuments: vi.fn(),
       getDocument: vi.fn(),
       getDocuments: vi.fn(),
-      getDatabaseInfo: vi.fn(),
+      getDatabaseInfo: vi.fn(async () => ({
+        db_name: 'test-db',
+        doc_count: 0,
+        update_seq: '123-abc',
+      })),
+    } as any;
+
+    // Mock StateStorage
+    mockStateStorage = {
+      initialize: vi.fn(),
+      getState: vi.fn(async () => ({})),
+      saveState: vi.fn(),
+      updateState: vi.fn(),
+      resetState: vi.fn(),
     } as any;
 
     // Create sync service
-    syncService = new SyncService(mockClient);
+    syncService = new SyncService(mockClient, mockStateStorage);
 
     // Mock assembler
     mockAssembler = {

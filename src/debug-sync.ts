@@ -8,6 +8,7 @@
 import { loadConfig } from './utils/config.js';
 import { CouchDBClient } from './core/couchdb-client.js';
 import { SyncService } from './services/sync-service.js';
+import { JsonFileStorage } from './storage/json-file-storage.js';
 import logger from './utils/logger.js';
 
 logger.level = 'debug';
@@ -56,8 +57,17 @@ async function debugSync() {
       logger.warn('Milestone document not found');
     }
 
+    // Initialize state storage
+    const stateStorage = new JsonFileStorage();
+    await stateStorage.initialize();
+
     // Initialize sync service
-    const syncService = new SyncService(couchdbClient, config.couchdb.passphrase);
+    const syncService = new SyncService(
+      couchdbClient,
+      stateStorage,
+      config.couchdb.passphrase
+    );
+    await syncService.initialize();
 
     // Perform sync
     logger.info('Starting sync operation...');

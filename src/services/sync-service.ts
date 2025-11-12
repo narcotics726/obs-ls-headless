@@ -1,6 +1,6 @@
 import { CouchDBClient } from '../core/couchdb-client.js';
 import { ChunkAssembler } from '../core/chunk-assembler.js';
-import { IDocumentAssembler } from '../core/interfaces.js';
+import { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
 import { SyncStatus, LiveSyncDocument, Note } from '../types/index.js';
 import logger from '../utils/logger.js';
 
@@ -11,12 +11,18 @@ import logger from '../utils/logger.js';
 export class SyncService {
   private client: CouchDBClient;
   private assembler: IDocumentAssembler;
+  private stateStorage: IStateStorage;
   private status: SyncStatus;
   private syncInterval?: NodeJS.Timeout;
   private notes: Map<string, Note> = new Map();
 
-  constructor(client: CouchDBClient, passphrase?: string) {
+  constructor(
+    client: CouchDBClient,
+    stateStorage: IStateStorage,
+    passphrase?: string
+  ) {
     this.client = client;
+    this.stateStorage = stateStorage;
     // Use ChunkAssembler as default implementation
     // Can be swapped with other implementations (e.g., DirectFileManipulator wrapper)
     this.assembler = new ChunkAssembler(client, passphrase);
@@ -26,6 +32,20 @@ export class SyncService {
       lastSyncSuccess: false,
       documentsCount: 0,
     };
+  }
+
+  /**
+   * Initialize the sync service by loading persisted state
+   * Should be called after construction
+   */
+  async initialize(): Promise<void> {
+    const state = await this.stateStorage.getState();
+    if (state.lastSeq) {
+      this.status.lastSeq = state.lastSeq;
+      logger.info({ lastSeq: state.lastSeq }, 'Loaded persisted sync state');
+    } else {
+      logger.info('No persisted sync state found, will perform full sync');
+    }
   }
 
   /**
@@ -86,13 +106,23 @@ export class SyncService {
       const documents = await this.client.getAllDocuments();
       await this.processDocuments(documents);
 
+      // Get current database update_seq for next incremental sync
+      const dbInfo = await this.client.getDatabaseInfo();
+      this.status.lastSeq = String(dbInfo.update_seq);
+
       this.status.lastSyncTime = new Date();
       this.status.lastSyncSuccess = true;
       this.status.documentsCount = documents.length;
       delete this.status.error;
 
+      // Persist state for incremental sync
+      await this.stateStorage.updateState({
+        lastSeq: this.status.lastSeq,
+        lastSyncTime: new Date().toISOString(),
+      });
+
       logger.info(
-        { count: documents.length, notesCount: this.notes.size },
+        { count: documents.length, notesCount: this.notes.size, lastSeq: this.status.lastSeq },
         'Sync completed successfully'
       );
     } catch (error: any) {
