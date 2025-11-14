@@ -2,10 +2,12 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { loadConfig } from './utils/config.js';
 import { CouchDBClient } from './core/couchdb-client.js';
+import { ChunkAssembler } from './core/chunk-assembler.js';
 import { SyncService } from './services/sync-service.js';
 import { JsonFileStorage } from './storage/json-file-storage.js';
 import { registerRoutes } from './api/routes.js';
 import logger from './utils/logger.js';
+import { MemoryNoteRepository } from './repositories/memory-note-repository.js';
 
 async function main() {
   // Load configuration
@@ -26,10 +28,13 @@ async function main() {
   await stateStorage.initialize();
 
   // Initialize sync service
+  const assembler = new ChunkAssembler(couchdbClient, config.couchdb.passphrase);
+  const noteRepository = new MemoryNoteRepository();
   const syncService = new SyncService(
     couchdbClient,
     stateStorage,
-    config.couchdb.passphrase
+    assembler,
+    noteRepository
   );
   await syncService.initialize();
 

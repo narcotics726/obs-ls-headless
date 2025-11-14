@@ -142,8 +142,8 @@ class DirectFileManipulatorAdapter implements IDocumentAssembler {
 const syncService = new SyncService(
   client,
   storage,
-  undefined,
-  new DirectFileManipulatorAdapter(manipulator)
+  new DirectFileManipulatorAdapter(manipulator),
+  repository
 );
 ```
 

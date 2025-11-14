@@ -76,10 +76,9 @@ interface IDocumentStorage {
   constructor(
     private client: CouchDBClient,
     private stateStorage: IStateStorage,
-    passphrase?: string,
-    assembler?: IDocumentAssembler
+    assembler: IDocumentAssembler
   ) {
-    this.assembler = assembler ?? new ChunkAssembler(client, passphrase);
+    this.assembler = assembler;
   }
   ```
 
@@ -235,12 +234,7 @@ class DirectFileManipulatorAdapter implements IDocumentAssembler {
 
 // 在 SyncService 中切换
 const adapter = new DirectFileManipulatorAdapter(manipulator);
-const syncService = new SyncService(
-  client,
-  storage,
-  undefined,
-  adapter
-);
+const syncService = new SyncService(client, storage, adapter, repository);
 ```
 
 ## 已知限制

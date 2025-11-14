@@ -51,7 +51,6 @@ describe('SyncService', () => {
     syncService = new SyncService(
       mockClient,
       mockStateStorage,
-      undefined,
       mockAssembler,
       noteRepository
     );
@@ -557,7 +556,6 @@ describe('SyncService', () => {
       const customService = new SyncService(
         mockClient,
         mockStateStorage,
-        undefined,
         customAssembler,
         noteRepository
       );
@@ -887,7 +885,6 @@ describe('SyncService', () => {
       syncService = new SyncService(
         mockClient,
         mockStateStorage,
-        undefined,
         mockAssembler,
         repoMock
       );
@@ -918,7 +915,6 @@ describe('SyncService', () => {
       syncService = new SyncService(
         mockClient,
         mockStateStorage,
-        undefined,
         mockAssembler,
         repoMock
       );

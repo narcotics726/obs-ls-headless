@@ -1,8 +1,6 @@
 import { CouchDBClient } from '../core/couchdb-client.js';
-import { ChunkAssembler } from '../core/chunk-assembler.js';
-import { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
+import type { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
 import { SyncStatus, LiveSyncDocument, Note } from '../types/index.js';
-import { MemoryNoteRepository } from '../repositories/memory-note-repository.js';
 import type { NoteRepository } from '../repositories/note-repository.js';
 import logger from '../utils/logger.js';
 
@@ -21,15 +19,13 @@ export class SyncService {
   constructor(
     client: CouchDBClient,
     stateStorage: IStateStorage,
-    passphrase?: string,
-    assembler?: IDocumentAssembler,
-    repository?: NoteRepository
+    assembler: IDocumentAssembler,
+    repository: NoteRepository
   ) {
     this.client = client;
     this.stateStorage = stateStorage;
-    // Allow custom assembler injection
-    this.assembler = assembler ?? new ChunkAssembler(client, passphrase);
-    this.repository = repository ?? new MemoryNoteRepository();
+    this.assembler = assembler;
+    this.repository = repository;
     this.status = {
       isRunning: false,
       lastSyncTime: null,

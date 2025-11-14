@@ -8,8 +8,10 @@
 import { loadConfig } from './utils/config.js';
 import { CouchDBClient } from './core/couchdb-client.js';
 import { SyncService } from './services/sync-service.js';
+import { ChunkAssembler } from './core/chunk-assembler.js';
 import { JsonFileStorage } from './storage/json-file-storage.js';
 import logger from './utils/logger.js';
+import { MemoryNoteRepository } from './repositories/memory-note-repository.js';
 
 logger.level = 'debug';
 
@@ -62,10 +64,13 @@ async function debugSync() {
     await stateStorage.initialize();
 
     // Initialize sync service
+    const assembler = new ChunkAssembler(couchdbClient, config.couchdb.passphrase);
+    const noteRepository = new MemoryNoteRepository();
     const syncService = new SyncService(
       couchdbClient,
       stateStorage,
-      config.couchdb.passphrase
+      assembler,
+      noteRepository
     );
     await syncService.initialize();
 
