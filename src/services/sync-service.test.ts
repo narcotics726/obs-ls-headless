@@ -605,6 +605,7 @@ describe('SyncService', () => {
             id: 'note2.md',
             seq: '124-def',
             changes: [{ rev: '1-xyz' }],
+            deleted: false,
             doc: {
               _id: 'note2.md',
               _rev: '1-xyz',
@@ -642,6 +643,7 @@ describe('SyncService', () => {
             id: 'updated-note.md',
             seq: '124-new',
             changes: [{ rev: '2-updated' }],
+            deleted: false,
             doc: {
               _id: 'updated-note.md',
               _rev: '2-updated',
@@ -725,6 +727,7 @@ describe('SyncService', () => {
             id: 'h:chunk123',
             seq: '101-new',
             changes: [{ rev: '1-abc' }],
+            deleted: false,
             doc: {
               _id: 'h:chunk123',
               _rev: '1-abc',
@@ -736,6 +739,7 @@ describe('SyncService', () => {
             id: 'ps:mapping',
             seq: '102-new',
             changes: [{ rev: '1-def' }],
+            deleted: false,
             doc: {
               _id: 'ps:mapping',
               _rev: '1-def',
@@ -745,6 +749,7 @@ describe('SyncService', () => {
             id: 'valid-note.md',
             seq: '103-new',
             changes: [{ rev: '1-ghi' }],
+            deleted: false,
             doc: {
               _id: 'valid-note.md',
               _rev: '1-ghi',
@@ -830,6 +835,7 @@ describe('SyncService', () => {
             id: 'note.md',
             seq: '105-new',
             changes: [{ rev: '1-abc' }],
+            deleted: false,
             doc: {
               _id: 'note.md',
               _rev: '1-abc',

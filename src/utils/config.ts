@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+import { resolve } from 'node:path';
+
 import { AppConfig } from '../types/index.js';
 
 dotenv.config();
@@ -20,5 +22,6 @@ export function loadConfig(): AppConfig {
       port: parseInt(process.env.PORT || '3000', 10),
       host: process.env.HOST || '0.0.0.0',
     },
+    vaultPath: process.env.VAULT_PATH || resolve(process.cwd(), 'vault'),
   };
 }

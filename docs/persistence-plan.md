@@ -2,9 +2,9 @@
 
 > 进度完成后，请勾选，方便追踪。
 
-- [ ] **需求与配置**
-  - [ ] 在配置中新增 `vaultPath`（或类似字段），说明默认值、目录结构、删除策略。
-  - [ ] 更新 `AppConfig` 类型、`loadConfig` 以及 `.env.example`、README。
+- [x] **需求与配置**
+  - [x] 在配置中新增 `vaultPath`（或类似字段），说明默认值、目录结构、删除策略。
+  - [x] 更新 `AppConfig` 类型、`loadConfig` 以及 `.env.example`、README。
 
 - [ ] **抽象存储接口**
   - [ ] 定义 `NoteRepository` 接口（写入、删除、读取单个/列表/搜索等方法）。

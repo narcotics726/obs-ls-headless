@@ -37,7 +37,9 @@ COUCHDB_PASSPHRASE=your-encryption-passphrase
    # Edit .env with your CouchDB credentials and encryption passphrase
    ```
 
-   **Important**: If your LiveSync database uses encryption, you **must** set `COUCHDB_PASSPHRASE` to match your Obsidian LiveSync passphrase.
+   **Important**:
+   - If your LiveSync database uses encryption, you **must** set `COUCHDB_PASSPHRASE` to match your Obsidian LiveSync passphrase.
+   - Set `VAULT_PATH` to the directory where synchronized notes should be stored (defaults to `./vault` if omitted).
 
 3. Run in development mode:
    ```bash
@@ -68,6 +70,10 @@ src/
 - `POST /sync/trigger` - Manually trigger sync
 - `GET /config` - Get current configuration
 - `PUT /config` - Update configuration
+
+## Local Vault Storage
+
+`VAULT_PATH` controls where assembled notes are written on disk. By default it resolves to `<project-root>/vault`, but you can point it to any absolute path (for example a mounted volume). The repository mirrors the original Obsidian paths under this directory, so a note stored as `folder/note.md` in CouchDB becomes `<VAULT_PATH>/folder/note.md`. When documents are deleted upstream, files are removed immediately rather than moved to a trash directory, so ensure the target path is version-controlled or backed up if you need recovery.
 
 ## Development
 

@@ -22,6 +22,7 @@ export interface AppConfig {
     port: number;
     host: string;
   };
+  vaultPath: string;
 }
 
 export interface SyncStatus {
