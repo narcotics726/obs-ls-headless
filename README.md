@@ -75,6 +75,12 @@ src/
 
 `VAULT_PATH` controls where assembled notes are written on disk. By default it resolves to `<project-root>/vault`, but you can point it to any absolute path (for example a mounted volume). The repository mirrors the original Obsidian paths under this directory, so a note stored as `folder/note.md` in CouchDB becomes `<VAULT_PATH>/folder/note.md`. When documents are deleted upstream, files are removed immediately rather than moved to a trash directory, so ensure the target path is version-controlled or backed up if you need recovery.
 
+Before enabling the planned disk-backed repository, make sure:
+- The directory referenced by `VAULT_PATH` already exists (e.g. run `mkdir -p /srv/vault && chown obsls:obsls /srv/vault`).
+- The service account has read/write/execute permission on every parent directory (`ls -ld /srv /srv/vault` should show the correct owner and `rwx` bits).
+- The filesystem has enough free space and inodes; low-disk situations will surface as write errors in the logs.
+- When troubleshooting missing files, first confirm the process can touch a sentinel file (`sudo -u obsls touch "$VAULT_PATH/.health"`), then inspect the SyncService logs for any file write error entries (e.g., permission denied, disk full, etc.). If a dedicated "Vault write failed" log message is introduced in a future release, it will be documented here.
+
 ## Development
 
 - `npm run dev` - Start development server with hot reload

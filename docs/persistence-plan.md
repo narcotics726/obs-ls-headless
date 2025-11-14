@@ -25,6 +25,8 @@
   - [ ] 为 `NoteRepository` 接口编写单元测试（Mock 实现 + 真实文件实现）。
   - [ ] 扩展 `sync-service.test.ts`，校验 repository 的写入/删除被调用。
   - [ ] 更新 README，说明本地 vault 的位置和使用方式。
+  - [ ] 补充 `NoteRepository` 错误/边界测试，覆盖删除缺失 ID、空搜索等情况。
+  - [ ] 描述 vault 目录初始化、权限与常见异常的排查指引。
 
 - [ ] **异常处理与告警**
   - [ ] `DiskNoteRepository` 对磁盘写入/删除失败时，抛出可识别错误并记录高优先级告警日志。
@@ -44,3 +46,5 @@
 - ~~**测试隔离**：文件实现需要可配置的临时目录，避免污染真实 vault；确保 Vitest 环境下能够方便地 mock/stub。~~（方案：非文件相关测试使用 `MemoryNoteRepository`，文件实现测试使用系统临时目录）
 
 > 后续如果发现新的风险或设计决策，可在此文件继续追加，方便跟踪与沟通。
+  - [ ] `SyncService.initialize` 检查 `lastSeq` 与 repository 数据是否一致，异常时强制全量并记录告警。
+  - [ ] 将初始化/目录异常信息暴露在 `/sync/status`，便于监控。

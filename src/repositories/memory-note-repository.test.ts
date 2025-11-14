@@ -75,4 +75,27 @@ describe('MemoryNoteRepository', () => {
     const contentMatches = await repository.search('KEYWORD');
     expect(contentMatches.map((n) => n.id)).toEqual(['content']);
   });
+
+  it('ignores missing ids when deleting', async () => {
+    await repository.saveMany([
+      createNote({ id: 'a' }),
+      createNote({ id: 'b' }),
+    ]);
+
+    await repository.delete('missing');
+    await repository.deleteMany(['still-missing']);
+
+    const notes = await repository.getAll();
+    expect(notes).toHaveLength(2);
+    expect(notes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('returns empty array when search query is blank or no matches', async () => {
+    await repository.saveMany([
+      createNote({ id: 'only', path: 'note.md', content: 'content' }),
+    ]);
+
+    expect(await repository.search('   ')).toEqual([]);
+    expect(await repository.search('missing-term')).toEqual([]);
+  });
 });
