@@ -92,6 +92,7 @@ export class SyncService {
 
   /**
    * Perform a single synchronization
+   * Automatically chooses between full sync and incremental sync
    */
   async sync(): Promise<void> {
     if (this.status.isRunning) {
@@ -99,8 +100,27 @@ export class SyncService {
       return;
     }
 
+    // Choose sync strategy based on lastSeq
+    if (!this.status.lastSeq) {
+      logger.info('No lastSeq found, performing full sync');
+      await this.fullSync();
+    } else {
+      logger.info({ lastSeq: this.status.lastSeq }, 'Performing incremental sync');
+      await this.incrementalSync();
+    }
+  }
+
+  /**
+   * Perform a full synchronization (fetch all documents)
+   */
+  private async fullSync(): Promise<void> {
+    if (this.status.isRunning) {
+      logger.warn('Sync already in progress');
+      return;
+    }
+
     this.status.isRunning = true;
-    logger.info('Starting sync');
+    logger.info('Starting full sync');
 
     try {
       const documents = await this.client.getAllDocuments();
@@ -123,12 +143,115 @@ export class SyncService {
 
       logger.info(
         { count: documents.length, notesCount: this.notes.size, lastSeq: this.status.lastSeq },
-        'Sync completed successfully'
+        'Full sync completed successfully'
       );
     } catch (error: any) {
       this.status.lastSyncSuccess = false;
       this.status.error = error.message;
-      logger.error({ error }, 'Sync failed');
+      logger.error({ error }, 'Full sync failed');
+      throw error;
+    } finally {
+      this.status.isRunning = false;
+    }
+  }
+
+  /**
+   * Perform an incremental synchronization (fetch only changes since lastSeq)
+   */
+  private async incrementalSync(): Promise<void> {
+    if (this.status.isRunning) {
+      logger.warn('Sync already in progress');
+      return;
+    }
+
+    this.status.isRunning = true;
+    logger.info({ lastSeq: this.status.lastSeq }, 'Starting incremental sync');
+
+    try {
+      // Get changes since last sync
+      const changes = await this.client.getChanges(this.status.lastSeq);
+
+      if (!changes.results || changes.results.length === 0) {
+        logger.info('No changes detected');
+        this.status.lastSyncTime = new Date();
+        this.status.lastSyncSuccess = true;
+        this.status.documentsCount = 0;
+        delete this.status.error;
+        return;
+      }
+
+      logger.info({ changesCount: changes.results.length }, 'Processing changes');
+
+      // Separate changed documents and deleted documents
+      const changedDocs: LiveSyncDocument[] = [];
+      const deletedIds: string[] = [];
+
+      for (const change of changes.results) {
+        // Skip internal documents (containing ':')
+        if (change.id.includes(':')) {
+          continue;
+        }
+
+        // Type assertion: CouchDB changes API with include_docs=true returns a 'doc' field
+        // containing the full document content. This is confirmed in the official CouchDB docs:
+        // https://docs.couchdb.org/en/stable/api/database/changes.html#get--db-_changes
+        // Quote: "Include the associated document with each result."
+        // However, Nano's TypeScript types don't include this field, so we use 'as any'.
+        const changeWithDoc = change as any;
+
+        // Handle deleted documents
+        if (change.deleted || changeWithDoc.doc?.deleted || changeWithDoc.doc?._deleted) {
+          deletedIds.push(change.id);
+          logger.debug({ id: change.id }, 'Document marked for deletion');
+          continue;
+        }
+
+        // Collect changed documents
+        if (changeWithDoc.doc) {
+          changedDocs.push(changeWithDoc.doc as LiveSyncDocument);
+        }
+      }
+
+      // Process changed documents
+      if (changedDocs.length > 0) {
+        await this.processDocuments(changedDocs);
+        logger.info({ count: changedDocs.length }, 'Processed changed documents');
+      }
+
+      // Remove deleted notes from memory
+      if (deletedIds.length > 0) {
+        for (const id of deletedIds) {
+          this.notes.delete(id);
+        }
+        logger.info({ count: deletedIds.length }, 'Removed deleted documents');
+      }
+
+      // Update lastSeq to the latest
+      this.status.lastSeq = String(changes.last_seq);
+      this.status.lastSyncTime = new Date();
+      this.status.lastSyncSuccess = true;
+      this.status.documentsCount = changedDocs.length;
+      delete this.status.error;
+
+      // Persist state for next incremental sync
+      await this.stateStorage.updateState({
+        lastSeq: this.status.lastSeq,
+        lastSyncTime: new Date().toISOString(),
+      });
+
+      logger.info(
+        {
+          changedCount: changedDocs.length,
+          deletedCount: deletedIds.length,
+          notesCount: this.notes.size,
+          lastSeq: this.status.lastSeq,
+        },
+        'Incremental sync completed successfully'
+      );
+    } catch (error: any) {
+      this.status.lastSyncSuccess = false;
+      this.status.error = error.message;
+      logger.error({ error }, 'Incremental sync failed');
       throw error;
     } finally {
       this.status.isRunning = false;

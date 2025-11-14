@@ -21,6 +21,7 @@ describe('SyncService', () => {
         doc_count: 0,
         update_seq: '123-abc',
       })),
+      getChanges: vi.fn(),
     } as any;
 
     // Mock StateStorage
@@ -564,6 +565,297 @@ describe('SyncService', () => {
       expect(customAssembler.assembleDocument).toHaveBeenCalled();
       const note = syncService.getNote('note.md');
       expect(note?.content).toBe('Custom content');
+    });
+  });
+
+  describe('Incremental sync', () => {
+
+    it('should perform full sync when lastSeq is not set', async () => {
+      const documents: LiveSyncDocument[] = [
+        {
+          _id: 'note1.md',
+          _rev: '1-abc',
+          type: 'newnote',
+          path: 'note1.md',
+          data: 'content1',
+          mtime: Date.now(),
+          ctime: Date.now(),
+          size: 100,
+        },
+      ];
+
+      mockClient.getAllDocuments = vi.fn(async () => documents);
+
+      await syncService.sync();
+
+      // Should call getAllDocuments (full sync), not getChanges
+      expect(mockClient.getAllDocuments).toHaveBeenCalled();
+      expect(mockClient.getChanges).not.toHaveBeenCalled();
+    });
+
+    it('should perform incremental sync when lastSeq is set', async () => {
+      // First, do a full sync to set lastSeq
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      // Now mock getChanges for incremental sync
+      const changes = {
+        results: [
+          {
+            id: 'note2.md',
+            seq: '124-def',
+            changes: [{ rev: '1-xyz' }],
+            doc: {
+              _id: 'note2.md',
+              _rev: '1-xyz',
+              type: 'newnote',
+              path: 'note2.md',
+              data: 'content2',
+              mtime: Date.now(),
+              ctime: Date.now(),
+              size: 100,
+            },
+          },
+        ],
+        last_seq: '124-def',
+        pending: 0,
+      };
+
+      mockClient.getChanges = vi.fn(async () => changes);
+
+      await syncService.sync();
+
+      // Should call getChanges (incremental sync), not getAllDocuments
+      expect(mockClient.getChanges).toHaveBeenCalledWith('123-abc');
+      expect(mockClient.getAllDocuments).toHaveBeenCalledTimes(1); // Only from first sync
+    });
+
+    it('should process changed documents in incremental sync', async () => {
+      // First, do a full sync to set lastSeq properly
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      // Now mock getChanges for incremental sync
+      const changes = {
+        results: [
+          {
+            id: 'updated-note.md',
+            seq: '124-new',
+            changes: [{ rev: '2-updated' }],
+            doc: {
+              _id: 'updated-note.md',
+              _rev: '2-updated',
+              type: 'newnote',
+              path: 'updated-note.md',
+              data: 'updated content',
+              mtime: Date.now(),
+              ctime: Date.now(),
+              size: 200,
+            },
+          },
+        ],
+        last_seq: '124-new',
+        pending: 0,
+      };
+
+      mockClient.getChanges = vi.fn(async () => changes);
+
+      await syncService.sync();
+
+      // Should process the updated document
+      expect(mockAssembler.assembleDocument).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: 'updated-note.md' })
+      );
+
+      // Should update lastSeq
+      const updatedStatus = syncService.getStatus();
+      expect(updatedStatus.lastSeq).toBe('124-new');
+    });
+
+    it('should handle deleted documents in incremental sync', async () => {
+      // First, add a note
+      const documents: LiveSyncDocument[] = [
+        {
+          _id: 'to-be-deleted.md',
+          _rev: '1-abc',
+          type: 'newnote',
+          path: 'to-be-deleted.md',
+          data: 'content',
+          mtime: Date.now(),
+          ctime: Date.now(),
+          size: 100,
+        },
+      ];
+      mockClient.getAllDocuments = vi.fn(async () => documents);
+      await syncService.sync();
+
+      // Verify note exists
+      expect(syncService.getNote('to-be-deleted.md')).toBeDefined();
+
+      // Now simulate deletion via incremental sync
+      const changes = {
+        results: [
+          {
+            id: 'to-be-deleted.md',
+            seq: '124-del',
+            changes: [{ rev: '2-deleted' }],
+            deleted: true,
+          },
+        ],
+        last_seq: '124-del',
+        pending: 0,
+      };
+
+      mockClient.getChanges = vi.fn(async () => changes);
+
+      await syncService.sync();
+
+      // Note should be removed
+      expect(syncService.getNote('to-be-deleted.md')).toBeUndefined();
+    });
+
+    it('should skip internal documents in incremental sync', async () => {
+      // First, do a full sync to set lastSeq
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      const changes = {
+        results: [
+          {
+            id: 'h:chunk123',
+            seq: '101-new',
+            changes: [{ rev: '1-abc' }],
+            doc: {
+              _id: 'h:chunk123',
+              _rev: '1-abc',
+              type: 'leaf',
+              data: 'chunk data',
+            },
+          },
+          {
+            id: 'ps:mapping',
+            seq: '102-new',
+            changes: [{ rev: '1-def' }],
+            doc: {
+              _id: 'ps:mapping',
+              _rev: '1-def',
+            },
+          },
+          {
+            id: 'valid-note.md',
+            seq: '103-new',
+            changes: [{ rev: '1-ghi' }],
+            doc: {
+              _id: 'valid-note.md',
+              _rev: '1-ghi',
+              type: 'newnote',
+              path: 'valid-note.md',
+              data: 'content',
+              mtime: Date.now(),
+              ctime: Date.now(),
+              size: 100,
+            },
+          },
+        ],
+        last_seq: '103-new',
+        pending: 0,
+      };
+
+      mockClient.getChanges = vi.fn(async () => changes);
+
+      await syncService.sync();
+
+      // Should only process the valid note, not internal documents
+      expect(mockAssembler.assembleDocument).toHaveBeenCalledTimes(1);
+      expect(mockAssembler.assembleDocument).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: 'valid-note.md' })
+      );
+    });
+
+    it('should handle empty changes in incremental sync', async () => {
+      // First, do a full sync to set lastSeq
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      const changes = {
+        results: [],
+        last_seq: '100-old',
+        pending: 0,
+      };
+
+      mockClient.getChanges = vi.fn(async () => changes);
+
+      await syncService.sync();
+
+      // Should not process any documents
+      expect(mockAssembler.assembleDocument).not.toHaveBeenCalled();
+
+      // Should still update status
+      const updatedStatus = syncService.getStatus();
+      expect(updatedStatus.lastSyncSuccess).toBe(true);
+    });
+
+    it('should clear previous errors when incremental sync returns no changes', async () => {
+      // Establish lastSeq through a successful full sync
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      // Simulate a failed incremental sync to leave an error in status
+      mockClient.getChanges = vi.fn(async () => {
+        throw new Error('Temporary incremental failure');
+      });
+      await expect(syncService.sync()).rejects.toThrow('Temporary incremental failure');
+
+      // Next incremental sync returns no changes and should clear the error
+      mockClient.getChanges = vi.fn(async () => ({
+        results: [],
+        last_seq: '123-abc',
+        pending: 0,
+      }));
+      await syncService.sync();
+
+      const updatedStatus = syncService.getStatus();
+      expect(updatedStatus.lastSyncSuccess).toBe(true);
+      expect(updatedStatus.error).toBeUndefined();
+    });
+
+    it('should persist lastSeq after incremental sync', async () => {
+      // First, do a full sync to set lastSeq
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      const changes = {
+        results: [
+          {
+            id: 'note.md',
+            seq: '105-new',
+            changes: [{ rev: '1-abc' }],
+            doc: {
+              _id: 'note.md',
+              _rev: '1-abc',
+              type: 'newnote',
+              path: 'note.md',
+              data: 'content',
+              mtime: Date.now(),
+              ctime: Date.now(),
+              size: 100,
+            },
+          },
+        ],
+        last_seq: '105-new',
+        pending: 0,
+      };
+
+      mockClient.getChanges = vi.fn(async () => changes);
+
+      await syncService.sync();
+
+      // Should persist the new lastSeq
+      expect(mockStateStorage.updateState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastSeq: '105-new',
+        })
+      );
     });
   });
 });

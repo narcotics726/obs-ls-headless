@@ -43,3 +43,5 @@ data/
 *.db
 
 .direnv
+
+.obs-ls-headless-state.json
