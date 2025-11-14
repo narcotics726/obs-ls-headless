@@ -9,7 +9,7 @@
 - [ ] **抽象存储接口**
   - [x] 定义 `NoteRepository` 接口（写入、删除、读取单个/列表/搜索等方法）。
   - [x] 实现 `MemoryNoteRepository`（复用当前 Map 逻辑），确保现状功能不变。
-  - [ ] 让 `SyncService`、API、调试脚本改为依赖 `NoteRepository`。
+  - [x] 让 `SyncService`、API、调试脚本改为依赖 `NoteRepository`。
 
 - [ ] **文件系统实现（下一阶段）**
   - [ ] `DiskNoteRepository`：基础写入/删除（含 markdown + 二进制）。

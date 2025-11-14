@@ -83,7 +83,7 @@ async function debugSync() {
     }, 'Sync status');
 
     // Get notes
-    const notes = syncService.getNotes();
+    const notes = await syncService.getNotes();
     logger.info({ notesCount: notes.length }, 'Notes retrieved');
 
     // Display sample notes

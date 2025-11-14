@@ -112,7 +112,7 @@ src/
 - Manages auto-sync intervals
 - Provides note search and retrieval
 - Key methods: `sync()`, `startAutoSync()`, `stopAutoSync()`, `getNotes()`, `searchNotes()`
-- Supports swappable assembler implementations via `setAssembler()`
+- Supports swappable assembler implementations via constructor injection
 
 **API Routes** (`src/api/routes.ts`):
 - Fastify route handlers

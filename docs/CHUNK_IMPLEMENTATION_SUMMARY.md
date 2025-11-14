@@ -72,29 +72,27 @@ interface IDocumentStorage {
 **主要改进**：
 
 1. **依赖注入**：
-   ```typescript
-   constructor(client: CouchDBClient, passphrase?: string) {
-     this.assembler = new ChunkAssembler(client, passphrase);
-   }
-   ```
+  ```typescript
+  constructor(
+    private client: CouchDBClient,
+    private stateStorage: IStateStorage,
+    passphrase?: string,
+    assembler?: IDocumentAssembler
+  ) {
+    this.assembler = assembler ?? new ChunkAssembler(client, passphrase);
+  }
+  ```
 
-2. **可替换实现**：
-   ```typescript
-   setAssembler(assembler: IDocumentAssembler): void {
-     this.assembler = assembler;
-   }
-   ```
-
-3. **改进的文档过滤**：
+2. **改进的文档过滤**：
    - 跳过 chunk 文档（`h:`, `h:+`）
    - 跳过其他内部文档（`ps:`, `ix:` 等）
    - 只处理元数据文档（`type="newnote"` 或 `"plain"`）
 
-4. **异步处理**：
+3. **异步处理**：
    - `processDocuments()` 改为 async
    - 支持并发 chunk 读取
 
-5. **详细统计**：
+4. **详细统计**：
    - 处理成功/跳过/错误的文档数量
    - 每个笔记的内容长度
 
@@ -237,7 +235,12 @@ class DirectFileManipulatorAdapter implements IDocumentAssembler {
 
 // 在 SyncService 中切换
 const adapter = new DirectFileManipulatorAdapter(manipulator);
-syncService.setAssembler(adapter);
+const syncService = new SyncService(
+  client,
+  storage,
+  undefined,
+  adapter
+);
 ```
 
 ## 已知限制

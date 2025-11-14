@@ -30,7 +30,7 @@ export async function registerRoutes(
 
   // Get specific note
   app.get<{ Params: { id: string } }>('/notes/:id', async (request, reply) => {
-    const note = syncService.getNote(request.params.id);
+    const note = await syncService.getNote(request.params.id);
     if (!note) {
       reply.code(404);
       return { error: 'Note not found' };

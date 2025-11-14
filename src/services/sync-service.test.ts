@@ -3,11 +3,14 @@ import { SyncService } from './sync-service.js';
 import { CouchDBClient } from '../core/couchdb-client.js';
 import type { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
 import type { LiveSyncDocument } from '../types/index.js';
+import { MemoryNoteRepository } from '../repositories/memory-note-repository.js';
+import type { NoteRepository } from '../repositories/note-repository.js';
 
 describe('SyncService', () => {
   let mockClient: CouchDBClient;
   let mockAssembler: IDocumentAssembler;
   let mockStateStorage: IStateStorage;
+  let noteRepository: MemoryNoteRepository;
   let syncService: SyncService;
 
   beforeEach(() => {
@@ -33,9 +36,6 @@ describe('SyncService', () => {
       resetState: vi.fn(),
     } as any;
 
-    // Create sync service
-    syncService = new SyncService(mockClient, mockStateStorage);
-
     // Mock assembler
     mockAssembler = {
       assembleDocument: vi.fn(async (doc: LiveSyncDocument) => {
@@ -44,8 +44,18 @@ describe('SyncService', () => {
       }),
     };
 
-    // Set mock assembler
-    syncService.setAssembler(mockAssembler);
+    // Create repository
+    noteRepository = new MemoryNoteRepository();
+
+    // Create sync service with injected dependencies
+    syncService = new SyncService(
+      mockClient,
+      mockStateStorage,
+      undefined,
+      mockAssembler,
+      noteRepository
+    );
+
   });
 
   afterEach(() => {
@@ -422,7 +432,7 @@ describe('SyncService', () => {
 
       await syncService.sync();
 
-      const notes = syncService.getNotes();
+      const notes = await syncService.getNotes();
       // Should only have note2, not note1
       expect(notes).toHaveLength(1);
       expect(notes[0].id).toBe('note2.md');
@@ -458,39 +468,39 @@ describe('SyncService', () => {
       await syncService.sync();
     });
 
-    it('should get all notes', () => {
-      const notes = syncService.getNotes();
+    it('should get all notes', async () => {
+      const notes = await syncService.getNotes();
       expect(notes).toHaveLength(2);
       expect(notes[0].id).toBe('note1.md');
       expect(notes[1].id).toBe('note2.md');
     });
 
-    it('should get a specific note by id', () => {
-      const note = syncService.getNote('note1.md');
+    it('should get a specific note by id', async () => {
+      const note = await syncService.getNote('note1.md');
       expect(note).toBeDefined();
       expect(note?.path).toBe('folder/note1.md');
       expect(note?.content).toBe('Content of folder/note1.md');
     });
 
-    it('should return undefined for non-existent note', () => {
-      const note = syncService.getNote('non-existent.md');
+    it('should return undefined for non-existent note', async () => {
+      const note = await syncService.getNote('non-existent.md');
       expect(note).toBeUndefined();
     });
 
-    it('should search notes by path', () => {
-      const results = syncService.searchNotes('folder');
+    it('should search notes by path', async () => {
+      const results = await syncService.searchNotes('folder');
       expect(results).toHaveLength(1);
       expect(results[0].path).toBe('folder/note1.md');
     });
 
-    it('should search notes by content', () => {
-      const results = syncService.searchNotes('Content of note2');
+    it('should search notes by content', async () => {
+      const results = await syncService.searchNotes('Content of note2');
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe('note2.md');
     });
 
-    it('should perform case-insensitive search', () => {
-      const results = syncService.searchNotes('FOLDER');
+    it('should perform case-insensitive search', async () => {
+      const results = await syncService.searchNotes('FOLDER');
       expect(results).toHaveLength(1);
       expect(results[0].path).toBe('folder/note1.md');
     });
@@ -539,12 +549,18 @@ describe('SyncService', () => {
   });
 
   describe('Custom assembler', () => {
-    it('should allow setting custom assembler', async () => {
+    it('should allow injecting custom assembler', async () => {
       const customAssembler: IDocumentAssembler = {
         assembleDocument: vi.fn(async () => 'Custom content'),
       };
 
-      syncService.setAssembler(customAssembler);
+      const customService = new SyncService(
+        mockClient,
+        mockStateStorage,
+        undefined,
+        customAssembler,
+        noteRepository
+      );
 
       const documents: LiveSyncDocument[] = [
         {
@@ -560,10 +576,10 @@ describe('SyncService', () => {
       ];
 
       mockClient.getAllDocuments = vi.fn(async () => documents);
-      await syncService.sync();
+      await customService.sync();
 
       expect(customAssembler.assembleDocument).toHaveBeenCalled();
-      const note = syncService.getNote('note.md');
+      const note = await customService.getNote('note.md');
       expect(note?.content).toBe('Custom content');
     });
   });
@@ -692,7 +708,7 @@ describe('SyncService', () => {
       await syncService.sync();
 
       // Verify note exists
-      expect(syncService.getNote('to-be-deleted.md')).toBeDefined();
+      expect(await syncService.getNote('to-be-deleted.md')).toBeDefined();
 
       // Now simulate deletion via incremental sync
       const changes = {
@@ -713,7 +729,7 @@ describe('SyncService', () => {
       await syncService.sync();
 
       // Note should be removed
-      expect(syncService.getNote('to-be-deleted.md')).toBeUndefined();
+      expect(await syncService.getNote('to-be-deleted.md')).toBeUndefined();
     });
 
     it('should skip internal documents in incremental sync', async () => {
@@ -864,4 +880,92 @@ describe('SyncService', () => {
       );
     });
   });
+
+  describe('NoteRepository integration', () => {
+    it('should save assembled notes via repository', async () => {
+      const repoMock = createRepositoryMock();
+      syncService = new SyncService(
+        mockClient,
+        mockStateStorage,
+        undefined,
+        mockAssembler,
+        repoMock
+      );
+
+      const documents: LiveSyncDocument[] = [
+        {
+          _id: 'note.md',
+          _rev: '1-abc',
+          type: 'newnote',
+          path: 'note.md',
+          data: 'content',
+          mtime: Date.now(),
+          ctime: Date.now(),
+          size: 100,
+        },
+      ];
+      mockClient.getAllDocuments = vi.fn(async () => documents);
+
+      await syncService.sync();
+
+      expect(repoMock.saveMany).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'note.md', path: 'note.md' }),
+      ]);
+    });
+
+    it('should delete notes via repository during incremental sync', async () => {
+      const repoMock = createRepositoryMock();
+      syncService = new SyncService(
+        mockClient,
+        mockStateStorage,
+        undefined,
+        mockAssembler,
+        repoMock
+      );
+
+      mockClient.getAllDocuments = vi.fn(async () => []);
+      await syncService.sync();
+
+      mockClient.getChanges = vi.fn(async () => ({
+        results: [
+          {
+            id: 'obsolete.md',
+            seq: '2-def',
+            changes: [{ rev: '2-def' }],
+            deleted: true,
+          },
+        ],
+        last_seq: '2-def',
+        pending: 0,
+      }));
+
+      await syncService.sync();
+
+      expect(repoMock.deleteMany).toHaveBeenCalledWith(['obsolete.md']);
+    });
+  });
 });
+
+type NoteRepositoryMock = NoteRepository & {
+  save: ReturnType<typeof vi.fn>;
+  saveMany: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
+  deleteMany: ReturnType<typeof vi.fn>;
+  get: ReturnType<typeof vi.fn>;
+  getAll: ReturnType<typeof vi.fn>;
+  search: ReturnType<typeof vi.fn>;
+  count: ReturnType<typeof vi.fn>;
+};
+
+function createRepositoryMock(): NoteRepositoryMock {
+  return {
+    save: vi.fn(async () => {}),
+    saveMany: vi.fn(async () => {}),
+    delete: vi.fn(async () => {}),
+    deleteMany: vi.fn(async () => {}),
+    get: vi.fn(async () => undefined),
+    getAll: vi.fn(async () => []),
+    search: vi.fn(async () => []),
+    count: vi.fn(async () => 0),
+  };
+}

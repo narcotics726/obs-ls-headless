@@ -2,6 +2,8 @@ import { CouchDBClient } from '../core/couchdb-client.js';
 import { ChunkAssembler } from '../core/chunk-assembler.js';
 import { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
 import { SyncStatus, LiveSyncDocument, Note } from '../types/index.js';
+import { MemoryNoteRepository } from '../repositories/memory-note-repository.js';
+import type { NoteRepository } from '../repositories/note-repository.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -14,18 +16,20 @@ export class SyncService {
   private stateStorage: IStateStorage;
   private status: SyncStatus;
   private syncInterval?: NodeJS.Timeout;
-  private notes: Map<string, Note> = new Map();
+  private repository: NoteRepository;
 
   constructor(
     client: CouchDBClient,
     stateStorage: IStateStorage,
-    passphrase?: string
+    passphrase?: string,
+    assembler?: IDocumentAssembler,
+    repository?: NoteRepository
   ) {
     this.client = client;
     this.stateStorage = stateStorage;
-    // Use ChunkAssembler as default implementation
-    // Can be swapped with other implementations (e.g., DirectFileManipulator wrapper)
-    this.assembler = new ChunkAssembler(client, passphrase);
+    // Allow custom assembler injection
+    this.assembler = assembler ?? new ChunkAssembler(client, passphrase);
+    this.repository = repository ?? new MemoryNoteRepository();
     this.status = {
       isRunning: false,
       lastSyncTime: null,
@@ -46,15 +50,6 @@ export class SyncService {
     } else {
       logger.info('No persisted sync state found, will perform full sync');
     }
-  }
-
-  /**
-   * Set a custom document assembler implementation
-   * Allows switching between different assembly strategies
-   */
-  setAssembler(assembler: IDocumentAssembler): void {
-    this.assembler = assembler;
-    logger.info('Document assembler implementation changed');
   }
 
   /**
@@ -124,15 +119,17 @@ export class SyncService {
 
     try {
       const documents = await this.client.getAllDocuments();
-      await this.processDocuments(documents);
+      const result = await this.processDocuments(documents);
 
       // Get current database update_seq for next incremental sync
       const dbInfo = await this.client.getDatabaseInfo();
       this.status.lastSeq = String(dbInfo.update_seq);
 
+      const notesCount = await this.repository.count();
+
       this.status.lastSyncTime = new Date();
       this.status.lastSyncSuccess = true;
-      this.status.documentsCount = documents.length;
+      this.status.documentsCount = result.processedCount;
       delete this.status.error;
 
       // Persist state for incremental sync
@@ -142,7 +139,7 @@ export class SyncService {
       });
 
       logger.info(
-        { count: documents.length, notesCount: this.notes.size, lastSeq: this.status.lastSeq },
+        { count: documents.length, processed: result.processedCount, notesCount, lastSeq: this.status.lastSeq },
         'Full sync completed successfully'
       );
     } catch (error: any) {
@@ -213,16 +210,16 @@ export class SyncService {
       }
 
       // Process changed documents
+      let processedChanged = 0;
       if (changedDocs.length > 0) {
-        await this.processDocuments(changedDocs);
-        logger.info({ count: changedDocs.length }, 'Processed changed documents');
+        const result = await this.processDocuments(changedDocs);
+        processedChanged = result.processedCount;
+        logger.info({ count: processedChanged }, 'Processed changed documents');
       }
 
       // Remove deleted notes from memory
       if (deletedIds.length > 0) {
-        for (const id of deletedIds) {
-          this.notes.delete(id);
-        }
+        await this.repository.deleteMany(deletedIds);
         logger.info({ count: deletedIds.length }, 'Removed deleted documents');
       }
 
@@ -230,7 +227,7 @@ export class SyncService {
       this.status.lastSeq = String(changes.last_seq);
       this.status.lastSyncTime = new Date();
       this.status.lastSyncSuccess = true;
-      this.status.documentsCount = changedDocs.length;
+      this.status.documentsCount = processedChanged;
       delete this.status.error;
 
       // Persist state for next incremental sync
@@ -239,11 +236,13 @@ export class SyncService {
         lastSyncTime: new Date().toISOString(),
       });
 
+      const notesCount = await this.repository.count();
+
       logger.info(
         {
-          changedCount: changedDocs.length,
+          changedCount: processedChanged,
           deletedCount: deletedIds.length,
-          notesCount: this.notes.size,
+          notesCount,
           lastSeq: this.status.lastSeq,
         },
         'Incremental sync completed successfully'
@@ -267,10 +266,13 @@ export class SyncService {
    * 3. Skip deleted documents
    * 4. Process metadata documents (type="newnote" or "plain")
    */
-  private async processDocuments(documents: LiveSyncDocument[]): Promise<void> {
+  private async processDocuments(
+    documents: LiveSyncDocument[]
+  ): Promise<{ processedCount: number; skippedCount: number; errorCount: number }> {
     let processedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
+    const notesToSave: Note[] = [];
 
     for (const doc of documents) {
       logger.debug({ docId: doc._id, docType: doc.type, docPath: doc.path }, 'Processing document');
@@ -336,7 +338,7 @@ export class SyncService {
           size: doc.size || 0,
         };
 
-        this.notes.set(doc._id, note);
+        notesToSave.push(note);
         processedCount++;
         logger.debug({ docId: doc._id, path: doc.path, contentLength: content.length }, 'Note processed successfully');
       } catch (error: any) {
@@ -345,12 +347,18 @@ export class SyncService {
       }
     }
 
+    if (notesToSave.length > 0) {
+      await this.repository.saveMany(notesToSave);
+    }
+
     logger.info({
       total: documents.length,
       processed: processedCount,
       skipped: skippedCount,
       errors: errorCount
     }, 'Document processing summary');
+
+    return { processedCount, skippedCount, errorCount };
   }
 
   /**
@@ -363,26 +371,21 @@ export class SyncService {
   /**
    * Get all synchronized notes
    */
-  getNotes(): Note[] {
-    return Array.from(this.notes.values());
+  async getNotes(): Promise<Note[]> {
+    return this.repository.getAll();
   }
 
   /**
    * Get a specific note by ID
    */
-  getNote(id: string): Note | undefined {
-    return this.notes.get(id);
+  async getNote(id: string): Promise<Note | undefined> {
+    return this.repository.get(id);
   }
 
   /**
    * Search notes by path or content
    */
-  searchNotes(query: string): Note[] {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.notes.values()).filter(
-      (note) =>
-        note.path.toLowerCase().includes(lowerQuery) ||
-        note.content.toLowerCase().includes(lowerQuery)
-    );
+  async searchNotes(query: string): Promise<Note[]> {
+    return this.repository.search(query);
   }
 }

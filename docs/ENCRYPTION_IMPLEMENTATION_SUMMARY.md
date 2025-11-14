@@ -139,7 +139,12 @@ class DirectFileManipulatorAdapter implements IDocumentAssembler {
 }
 
 // 切换实现
-syncService.setAssembler(new DirectFileManipulatorAdapter(manipulator));
+const syncService = new SyncService(
+  client,
+  storage,
+  undefined,
+  new DirectFileManipulatorAdapter(manipulator)
+);
 ```
 
 ## 📝 技术细节
