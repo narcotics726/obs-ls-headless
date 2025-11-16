@@ -16,8 +16,10 @@
     - 已实现统一写入/删除逻辑，支持多级目录创建并通过 NoteRepository API 复用。
   - [x] `DiskNoteRepository`：目录创建、路径校验（防止越界、注入）。
     - 引入 sanitizeRelativePath 校验，拦截绝对路径与越界路径，并补充单元测试覆盖。
-  - [ ] 为 repository 提供配置注入（从 `vaultPath` 创建实例）。
-  - [ ] 在 `index.ts` 等入口通过构造函数注入选择具体实现。
+  - [x] 为 repository 提供配置注入（从 `vaultPath` 创建实例）。
+    - `loadConfig` 中的 `vaultPath` 已通过入口脚本传入 `DiskNoteRepository`。
+  - [x] 在 `index.ts` 等入口通过构造函数注入选择具体实现。
+    - `index.ts`、`src/debug-sync.ts` 已改为注入磁盘实现，并记录 vault 路径日志。
 
 - [ ] **启动与状态**
   - [ ] `SyncService.initialize`：检测状态/目录异常时强制全量同步并记录告警。

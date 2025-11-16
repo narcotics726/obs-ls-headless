@@ -7,7 +7,7 @@ import { SyncService } from './services/sync-service.js';
 import { JsonFileStorage } from './storage/json-file-storage.js';
 import { registerRoutes } from './api/routes.js';
 import logger from './utils/logger.js';
-import { MemoryNoteRepository } from './repositories/memory-note-repository.js';
+import { DiskNoteRepository } from './repositories/disk-note-repository.js';
 
 async function main() {
   // Load configuration
@@ -29,7 +29,8 @@ async function main() {
 
   // Initialize sync service
   const assembler = new ChunkAssembler(couchdbClient, config.couchdb.passphrase);
-  const noteRepository = new MemoryNoteRepository();
+  const noteRepository = new DiskNoteRepository(config.vaultPath);
+  logger.info({ vaultPath: config.vaultPath }, 'Initialized disk note repository');
   const syncService = new SyncService(
     couchdbClient,
     stateStorage,
