@@ -6,14 +6,16 @@
   - [x] 在配置中新增 `vaultPath`（或类似字段），说明默认值、目录结构、删除策略。
   - [x] 更新 `AppConfig` 类型、`loadConfig` 以及 `.env.example`、README。
 
-- [ ] **抽象存储接口**
+- [x] **抽象存储接口**
   - [x] 定义 `NoteRepository` 接口（写入、删除、读取单个/列表/搜索等方法）。
   - [x] 实现 `MemoryNoteRepository`（复用当前 Map 逻辑），确保现状功能不变。
   - [x] 让 `SyncService`、API、调试脚本改为依赖 `NoteRepository`。
 
 - [ ] **文件系统实现（下一阶段）**
-  - [ ] `DiskNoteRepository`：基础写入/删除（含 markdown + 二进制）。
-  - [ ] `DiskNoteRepository`：目录创建、路径校验（防止越界、注入）。
+  - [x] `DiskNoteRepository`：基础写入/删除（含 markdown + 二进制）。
+    - 已实现统一写入/删除逻辑，支持多级目录创建并通过 NoteRepository API 复用。
+  - [x] `DiskNoteRepository`：目录创建、路径校验（防止越界、注入）。
+    - 引入 sanitizeRelativePath 校验，拦截绝对路径与越界路径，并补充单元测试覆盖。
   - [ ] 为 repository 提供配置注入（从 `vaultPath` 创建实例）。
   - [ ] 在 `index.ts` 等入口通过构造函数注入选择具体实现。
 

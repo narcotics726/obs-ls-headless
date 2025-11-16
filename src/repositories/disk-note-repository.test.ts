@@ -45,4 +45,21 @@ describe('DiskNoteRepository', () => {
     const note = createNote({ path: '../evil.txt', id: '../evil.txt' });
     await expect(repository.save(note)).rejects.toThrow('Invalid note path');
   });
+
+  it('allows note names containing dots without rejection', async () => {
+    const note = createNote({ path: 'folder/note..md', id: 'folder/note..md' });
+    await repository.save(note);
+    const stored = await repository.get(note.id);
+    expect(stored).toBeDefined();
+  });
+
+  it('rejects Windows-style traversal attempts', async () => {
+    const note = createNote({ path: '..\\evil.txt', id: '..\\evil.txt' });
+    await expect(repository.save(note)).rejects.toThrow('Invalid note path');
+  });
+
+  it('rejects absolute paths', async () => {
+    const note = createNote({ path: '/etc/passwd', id: '/etc/passwd' });
+    await expect(repository.save(note)).rejects.toThrow('Invalid note path');
+  });
 });

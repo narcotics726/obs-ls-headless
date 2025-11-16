@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { dirname, relative, resolve, sep } from 'node:path';
+import { dirname, posix, relative, resolve, sep } from 'node:path';
 
 import type { Note } from '../types/index.js';
 import type { NoteRepository } from './note-repository.js';
@@ -20,8 +20,7 @@ export class DiskNoteRepository implements NoteRepository {
 
   async save(note: Note): Promise<void> {
     await this.ready;
-    const relPath = this.getRelativePathForNote(note);
-    const target = this.resolveWithinVault(relPath);
+    const target = this.resolveWithinVault(this.getRelativePathForNote(note));
     await fs.mkdir(dirname(target), { recursive: true });
     await fs.writeFile(target, note.content ?? '', 'utf-8');
   }
@@ -79,22 +78,40 @@ export class DiskNoteRepository implements NoteRepository {
     if (!relativePath) {
       throw new Error('Invalid note path');
     }
-    if (relativePath.includes('..')) {
-      throw new Error('Invalid note path');
-    }
-    return relativePath;
+    return this.sanitizeRelativePath(relativePath);
   }
 
   private resolveWithinVault(relativePath: string): string {
-    const normalized = relativePath.replace(/^[/\\]+/, '');
-    if (normalized.includes('..')) {
-      throw new Error('Invalid note path');
-    }
-    const fullPath = resolve(this.root, normalized);
+    const sanitized = this.sanitizeRelativePath(relativePath);
+    const fullPath = resolve(this.root, sanitized);
     if (!this.isWithinVault(fullPath)) {
       throw new Error('Invalid note path');
     }
     return fullPath;
+  }
+
+  private sanitizeRelativePath(rawPath: string): string {
+    if (!rawPath || !rawPath.trim()) {
+      throw new Error('Invalid note path');
+    }
+
+    const unixLike = rawPath.replace(/\\/g, '/');
+
+    if (/^[A-Za-z]:/.test(unixLike)) {
+      throw new Error('Invalid note path');
+    }
+
+    if (unixLike.startsWith('/')) {
+      throw new Error('Invalid note path');
+    }
+
+    const normalized = posix.normalize(unixLike);
+
+    if (!normalized || normalized === '.' || normalized.startsWith('../')) {
+      throw new Error('Invalid note path');
+    }
+
+    return normalized;
   }
 
   private isWithinVault(path: string): boolean {
