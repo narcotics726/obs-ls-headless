@@ -22,7 +22,8 @@
     - `index.ts`、`src/debug-sync.ts` 已改为注入磁盘实现，并记录 vault 路径日志。
 
 - [ ] **启动与状态**
-  - [ ] `SyncService.initialize`：检测状态/目录异常时强制全量同步并记录告警。
+  - [x] `SyncService.initialize`：检测状态/目录异常时强制全量同步并记录告警。
+    - 初始化时统计 repository 数量并对 lastSeq 进行一致性校验，发现不匹配即重置 state、日志告警。
   - [ ] （可选）`NoteRepository` 提供 `loadAll()` 以便后续缓存方案使用。
 
 - [ ] **测试与文档**

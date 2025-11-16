@@ -40,6 +40,27 @@ export class SyncService {
    */
   async initialize(): Promise<void> {
     const state = await this.stateStorage.getState();
+    const repositoryCount = await this.repository.count();
+
+    if (state.lastSeq && repositoryCount === 0) {
+      logger.warn(
+        { lastSeq: state.lastSeq },
+        'State indicates incremental sync but repository is empty; forcing full sync'
+      );
+      await this.stateStorage.resetState();
+      this.status.lastSeq = undefined;
+      return;
+    }
+
+    if (!state.lastSeq && repositoryCount > 0) {
+      logger.warn(
+        { repositoryCount },
+        'Repository contains data but lastSeq is missing; forcing full sync'
+      );
+      this.status.lastSeq = undefined;
+      return;
+    }
+
     if (state.lastSeq) {
       this.status.lastSeq = state.lastSeq;
       logger.info({ lastSeq: state.lastSeq }, 'Loaded persisted sync state');

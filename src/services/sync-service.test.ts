@@ -940,6 +940,27 @@ describe('SyncService', () => {
       expect(repoMock.deleteMany).toHaveBeenCalledWith(['obsolete.md']);
     });
   });
+  describe('initialize', () => {
+    it('forces full sync when repository empty but state has lastSeq', async () => {
+      mockStateStorage.getState = vi.fn(async () => ({ lastSeq: '42-abc' }));
+      vi.spyOn(noteRepository, 'count').mockResolvedValue(0);
+
+      await syncService.initialize();
+
+      expect(mockStateStorage.resetState).toHaveBeenCalled();
+      expect(syncService.getStatus().lastSeq).toBeUndefined();
+    });
+
+    it('forces full sync when repository has data but lastSeq missing', async () => {
+      mockStateStorage.getState = vi.fn(async () => ({}));
+      vi.spyOn(noteRepository, 'count').mockResolvedValue(10);
+
+      await syncService.initialize();
+
+      expect(mockStateStorage.resetState).not.toHaveBeenCalled();
+      expect(syncService.getStatus().lastSeq).toBeUndefined();
+    });
+  });
 });
 
 type NoteRepositoryMock = NoteRepository & {
