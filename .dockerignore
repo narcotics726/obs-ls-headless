@@ -1,0 +1,25 @@
+# Node dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+coverage
+
+# Environment and config
+.env
+.env.*
+
+# Git files
+.git
+.gitignore
+
+# Editor / tooling artifacts
+.direnv
+.idea
+.vscode
+
+# Misc
+README.md
+docs
+# coverage already excluded above
