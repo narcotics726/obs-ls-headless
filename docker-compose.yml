@@ -1,29 +1,32 @@
-# Placeholder docker-compose file for obs-ls-headless deployment
-version: "3.9"
-
 services:
   obs-ls-headless:
-    image: ghcr.io/your-org/obs-ls-headless:latest
+    image: ghcr.io/narcotics726/obs-ls-headless:latest
     container_name: obs-ls-headless
     restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      HOST: 0.0.0.0
-      COUCHDB_URL: http://couchdb.example.com:5984
-      COUCHDB_USERNAME: your-username
-      COUCHDB_PASSWORD: your-password
-      COUCHDB_DATABASE: obsidian-livesync
-      COUCHDB_PASSPHRASE: ""
     volumes:
       - obs_state:/state
       - obs_data:/data
     # If you prefer loading from an env file:
-    # env_file:
-    #   - ./obs-ls.env
+    env_file:
+      - ./.env
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: obs-ls-caddy
+    depends_on:
+      - obs-ls-headless
+    restart: unless-stopped
+    environment:
+      - NO_PROXY=localhost,127.0.0.1,obs-ls-headless
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   obs_state:
   obs_data:
+  caddy_data:
+  caddy_config:

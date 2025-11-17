@@ -1,0 +1,11 @@
+{
+	# Enable logging as needed
+}
+
+:8001 {
+	basic_auth {
+		userfoo $2a$14$xwImb3MMXgKCjlXA9JRxGextAXk5rWWU2IR7tLnfFPQwUyfBgyyV6
+	}
+
+	reverse_proxy obs-ls-headless:8001
+}
