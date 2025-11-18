@@ -1,8 +1,9 @@
 import { CouchDBClient } from '../core/couchdb-client.js';
 import type { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
-import { SyncStatus, LiveSyncDocument, Note } from '../types/index.js';
+import { SyncStatus, LiveSyncDocument, Note, EventType } from '../types/index.js';
 import type { NoteRepository } from '../repositories/note-repository.js';
 import logger from '../utils/logger.js';
+import type { IEventBus } from '../core/event-bus.js';
 
 /**
  * Service for managing synchronization with CouchDB
@@ -15,17 +16,20 @@ export class SyncService {
   private status: SyncStatus;
   private syncInterval?: NodeJS.Timeout;
   private repository: NoteRepository;
+  private eventBus: IEventBus;
 
   constructor(
     client: CouchDBClient,
     stateStorage: IStateStorage,
     assembler: IDocumentAssembler,
-    repository: NoteRepository
+    repository: NoteRepository,
+    eventBus: IEventBus,
   ) {
     this.client = client;
     this.stateStorage = stateStorage;
     this.assembler = assembler;
     this.repository = repository;
+    this.eventBus = eventBus;
     this.status = {
       isRunning: false,
       lastSyncTime: null,
@@ -132,6 +136,7 @@ export class SyncService {
     }
 
     this.status.isRunning = true;
+    this.emitEvent(EventType.SyncStarted, { mode: 'full' });
     logger.info('Starting full sync');
 
     try {
@@ -159,10 +164,21 @@ export class SyncService {
         { count: documents.length, processed: result.processedCount, notesCount, lastSeq: this.status.lastSeq },
         'Full sync completed successfully'
       );
+      this.emitEvent(EventType.SyncCompleted, {
+        mode: 'full',
+        documentsCount: documents.length,
+        processedCount: result.processedCount,
+        notesCount,
+        lastSeq: this.status.lastSeq,
+      });
     } catch (error: any) {
       this.status.lastSyncSuccess = false;
       this.status.error = error.message;
       logger.error({ error }, 'Full sync failed');
+      this.emitEvent(EventType.SyncFailed, {
+        mode: 'full',
+        error: error.message,
+      });
       throw error;
     } finally {
       this.status.isRunning = false;
@@ -179,6 +195,7 @@ export class SyncService {
     }
 
     this.status.isRunning = true;
+    this.emitEvent(EventType.SyncStarted, { mode: 'incremental', lastSeq: this.status.lastSeq });
     logger.info({ lastSeq: this.status.lastSeq }, 'Starting incremental sync');
 
     try {
@@ -264,10 +281,22 @@ export class SyncService {
         },
         'Incremental sync completed successfully'
       );
+      this.emitEvent(EventType.SyncCompleted, {
+        mode: 'incremental',
+        changedCount: processedChanged,
+        deletedCount: deletedIds.length,
+        notesCount,
+        lastSeq: this.status.lastSeq,
+      });
     } catch (error: any) {
       this.status.lastSyncSuccess = false;
       this.status.error = error.message;
       logger.error({ error }, 'Incremental sync failed');
+      this.emitEvent(EventType.SyncFailed, {
+        mode: 'incremental',
+        error: error.message,
+        lastSeq: this.status.lastSeq,
+      });
       throw error;
     } finally {
       this.status.isRunning = false;
@@ -404,5 +433,19 @@ export class SyncService {
    */
   async searchNotes(query: string): Promise<Note[]> {
     return this.repository.search(query);
+  }
+
+  private emitEvent(type: EventType, payload?: Record<string, unknown>): void {
+    void this.eventBus.emit({
+      type,
+      timestamp: new Date(),
+      source: 'SyncService',
+      payload,
+      metadata: {
+        documentsCount: this.status.documentsCount,
+        lastSeq: this.status.lastSeq,
+        lastSyncSuccess: this.status.lastSyncSuccess,
+      },
+    });
   }
 }

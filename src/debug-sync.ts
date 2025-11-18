@@ -12,6 +12,7 @@ import { ChunkAssembler } from './core/chunk-assembler.js';
 import { JsonFileStorage } from './storage/json-file-storage.js';
 import logger from './utils/logger.js';
 import { DiskNoteRepository } from './repositories/disk-note-repository.js';
+import { createEventBus } from './core/event-bus.js';
 
 logger.level = 'debug';
 
@@ -67,11 +68,13 @@ async function debugSync() {
     const assembler = new ChunkAssembler(couchdbClient, config.couchdb.passphrase);
     const noteRepository = new DiskNoteRepository(config.vaultPath);
     logger.info({ vaultPath: config.vaultPath }, 'Using disk-backed note repository');
+    const eventBus = createEventBus();
     const syncService = new SyncService(
       couchdbClient,
       stateStorage,
       assembler,
-      noteRepository
+      noteRepository,
+      eventBus
     );
     await syncService.initialize();
 

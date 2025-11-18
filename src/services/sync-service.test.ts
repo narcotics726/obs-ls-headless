@@ -5,6 +5,7 @@ import type { IDocumentAssembler, IStateStorage } from '../core/interfaces.js';
 import type { LiveSyncDocument } from '../types/index.js';
 import { MemoryNoteRepository } from '../repositories/memory-note-repository.js';
 import type { NoteRepository } from '../repositories/note-repository.js';
+import { EventBus } from '../core/event-bus.js';
 
 describe('SyncService', () => {
   let mockClient: CouchDBClient;
@@ -52,7 +53,8 @@ describe('SyncService', () => {
       mockClient,
       mockStateStorage,
       mockAssembler,
-      noteRepository
+      noteRepository,
+new EventBus(),
     );
 
   });
@@ -557,7 +559,8 @@ describe('SyncService', () => {
         mockClient,
         mockStateStorage,
         customAssembler,
-        noteRepository
+        noteRepository,
+        new EventBus(),
       );
 
       const documents: LiveSyncDocument[] = [
@@ -886,7 +889,8 @@ describe('SyncService', () => {
         mockClient,
         mockStateStorage,
         mockAssembler,
-        repoMock
+        repoMock,
+        new EventBus(),
       );
 
       const documents: LiveSyncDocument[] = [
@@ -916,7 +920,8 @@ describe('SyncService', () => {
         mockClient,
         mockStateStorage,
         mockAssembler,
-        repoMock
+        repoMock,
+        new EventBus(),
       );
 
       mockClient.getAllDocuments = vi.fn(async () => []);

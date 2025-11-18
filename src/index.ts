@@ -8,6 +8,7 @@ import { JsonFileStorage } from './storage/json-file-storage.js';
 import { registerRoutes } from './api/routes.js';
 import logger from './utils/logger.js';
 import { DiskNoteRepository } from './repositories/disk-note-repository.js';
+import { createEventBus } from './core/event-bus.js';
 
 async function main() {
   // Load configuration
@@ -31,11 +32,19 @@ async function main() {
   const assembler = new ChunkAssembler(couchdbClient, config.couchdb.passphrase);
   const noteRepository = new DiskNoteRepository(config.vaultPath);
   logger.info({ vaultPath: config.vaultPath }, 'Initialized disk note repository');
+  const eventBus = createEventBus();
+  eventBus.subscribe('*', (event) => {
+    logger.debug(
+      { eventType: event.type, payload: event.payload, metadata: event.metadata, source: event.source },
+      'Event emitted'
+    );
+  });
   const syncService = new SyncService(
     couchdbClient,
     stateStorage,
     assembler,
-    noteRepository
+    noteRepository,
+    eventBus
   );
   await syncService.initialize();
 
