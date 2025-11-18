@@ -102,3 +102,25 @@ export interface Note {
   ctime: Date;
   size: number;
 }
+
+/**
+ * Event bus related types to decouple core services and plugins.
+ */
+export enum EventType {
+  SyncStarted = 'SyncStarted',
+  SyncCompleted = 'SyncCompleted',
+  SyncFailed = 'SyncFailed',
+  BackupTriggered = 'BackupTriggered',
+  BackupCompleted = 'BackupCompleted',
+  NoteIndexed = 'NoteIndexed',
+}
+
+export interface LiveSyncEvent {
+  type: EventType;
+  timestamp: Date;
+  source: string;
+  payload?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export type EventListener = (event: LiveSyncEvent) => void | Promise<void>;
