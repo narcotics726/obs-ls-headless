@@ -53,7 +53,6 @@ export class LiveSyncCrypto {
         hasPbkdf2salt: 'pbkdf2salt' in syncParams,
       }, 'Sync parameters document structure');
 
-      // Note: it's 'pbkdf2salt' (lowercase), not 'pbkdf2Salt'
       const saltBase64 = (syncParams as any).pbkdf2salt;
       if (!saltBase64) {
         throw new Error('pbkdf2salt not found in sync parameters document');

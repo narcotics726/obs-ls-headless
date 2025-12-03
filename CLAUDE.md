@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to ai agent when working with code in this repository.
 
 ## Tools
 
@@ -267,6 +267,8 @@ When writing tests:
 ## Dependencies
 
 Use `pnpm` to manage dependencies, run tasks and scripts.
+
+Remember to use `vitest --pool=threads --no-watch` to run tests in agent mode.
 
 - **octagonal-wheels**: Official LiveSync encryption library (HKDF, PBKDF2)
 - **nano**: CouchDB client for Node.js

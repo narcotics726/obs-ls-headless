@@ -28,7 +28,7 @@ COUCHDB_PASSPHRASE=your-encryption-passphrase
 
 1. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. Configure environment:
@@ -48,8 +48,8 @@ COUCHDB_PASSPHRASE=your-encryption-passphrase
 
 4. Build for production:
    ```bash
-   npm run build
-   npm start
+   pnpm run build
+   pnpm start
    ```
 
 ## Project Structure
@@ -65,11 +65,16 @@ src/
 
 ## API Endpoints
 
-- `GET /health` - Health check
-- `GET /sync/status` - Get current sync status
-- `POST /sync/trigger` - Manually trigger sync
-- `GET /config` - Get current configuration
-- `PUT /config` - Update configuration
+All routes are prefixed with `/api`:
+
+- `GET /api/health` - Health check
+- `GET /api/sync/status` - Get current sync status
+- `POST /api/sync/trigger` - Manually trigger sync
+- `GET /api/notes` - List notes
+- `GET /api/notes/:id` - Get note by id/path
+- `GET /api/notes/search?q=...` - Search notes
+- `GET /api/config` - Get current configuration (non-sensitive)
+- `PUT /api/config/sync` - Update sync config (`interval`, `autoSyncEnabled`)
 
 ## Local Vault Storage
 
