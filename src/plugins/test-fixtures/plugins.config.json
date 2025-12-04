@@ -1,0 +1,11 @@
+{
+  "plugins": [
+    {
+      "name": "plugin-stable",
+      "command": "node",
+      "args": [
+        "src/plugins/test-fixtures/plugin-stable.js"
+      ]
+    }
+  ]
+}
