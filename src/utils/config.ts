@@ -23,5 +23,8 @@ export function loadConfig(): AppConfig {
       host: process.env.HOST || '0.0.0.0',
     },
     vaultPath: process.env.VAULT_PATH || resolve(process.cwd(), 'vault'),
+    plugins: {
+      configPath: process.env.PLUGINS_CONFIG_PATH || '/plugins.config.json',
+    },
   };
 }

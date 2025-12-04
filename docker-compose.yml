@@ -6,6 +6,7 @@ services:
     volumes:
       - obs_state:/state
       - obs_data:/data
+      - ./plugin.config.json:/plugin.config.json:ro
     # If you prefer loading from an env file:
     env_file:
       - ./.env

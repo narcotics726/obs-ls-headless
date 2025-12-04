@@ -204,10 +204,23 @@ export class SyncService {
 
       if (!changes.results || changes.results.length === 0) {
         logger.info('No changes detected');
-        this.status.lastSyncTime = new Date();
+        const now = new Date();
+        this.status.lastSyncTime = now;
         this.status.lastSyncSuccess = true;
         this.status.documentsCount = 0;
         delete this.status.error;
+        const notesCount = await this.repository.count();
+        this.emitEvent(EventType.SyncCompleted, {
+          mode: 'incremental',
+          changedCount: 0,
+          deletedCount: 0,
+          notesCount,
+          lastSeq: this.status.lastSeq,
+        });
+        await this.stateStorage.updateState({
+          lastSeq: this.status.lastSeq,
+          lastSyncTime: now.toISOString(),
+        });
         return;
       }
 

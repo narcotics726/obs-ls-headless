@@ -23,7 +23,7 @@ function parseArgs(): Args {
   const configPath =
     configFlagIndex !== -1 && argv[configFlagIndex + 1]
       ? argv[configFlagIndex + 1]
-      : path.resolve(process.cwd(), 'src/plugins/test-fixtures/plugins.config.json');
+      : path.resolve(process.cwd(), 'plugins.config.json');
 
   return { configPath };
 }

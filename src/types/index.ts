@@ -23,6 +23,12 @@ export interface AppConfig {
     host: string;
   };
   vaultPath: string;
+  plugins?: {
+    /**
+     * Absolute or relative path to plugin config JSON (e.g., /plugin.config.json).
+     */
+    configPath?: string;
+  };
 }
 
 export interface SyncStatus {
