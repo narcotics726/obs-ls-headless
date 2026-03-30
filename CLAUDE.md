@@ -64,86 +64,7 @@ npm run format        # Format with Prettier
 
 ## Architecture
 
-### Directory Structure
-
-```
-src/
-├── core/           # Core sync engine and CouchDB client
-│   ├── couchdb-client.ts    # CouchDB connection and operations
-│   ├── chunk-assembler.ts   # Chunk assembly logic
-│   └── interfaces.ts        # Core interfaces (IDocumentAssembler, IDocumentStorage)
-├── api/            # REST API layer
-│   └── routes.ts            # API endpoint definitions
-├── services/       # Business logic
-│   └── sync-service.ts      # Sync orchestration and note management
-├── types/          # TypeScript type definitions
-│   └── index.ts             # Shared types (LiveSyncDocument, Note, EdenChunk, etc.)
-├── utils/          # Utility functions
-│   ├── config.ts            # Configuration loader
-│   ├── livesync-crypto.ts   # LiveSync HKDF encryption/decryption
-│   └── logger.ts            # Pino logger setup
-└── index.ts        # Application entry point
-```
-
-### Key Components
-
-**CouchDBClient** (`src/core/couchdb-client.ts`):
-- Implements `IDocumentStorage` interface
-- Low-level CouchDB operations using Nano
-- Handles authentication and connection management
-- Methods: `getAllDocuments()`, `getDocument()`, `getDocuments()` (bulk fetch), `getDatabaseInfo()`
-
-**ChunkAssembler** (`src/core/chunk-assembler.ts`):
-- Implements `IDocumentAssembler` interface
-- Assembles documents from chunks (children, eden, or direct data)
-- Integrates with LiveSyncCrypto for decryption
-- Supports three assembly strategies: direct data, children chunks, eden cache
-
-**LiveSyncCrypto** (`src/utils/livesync-crypto.ts`):
-- HKDF-based encryption/decryption using octagonal-wheels
-- Retrieves PBKDF2 salt from `_local/obsidian_livesync_sync_parameters`
-- Automatically detects encrypted data (`%=` prefix)
-- Key methods: `decrypt()`, `decryptBatch()`, `isEncrypted()`
-
-**SyncService** (`src/services/sync-service.ts`):
-- Orchestrates synchronization logic
-- Uses ChunkAssembler to handle document assembly and decryption
-- Converts LiveSync documents to Note objects
-- Manages auto-sync intervals
-- Provides note search and retrieval
-- Key methods: `sync()`, `startAutoSync()`, `stopAutoSync()`, `getNotes()`, `searchNotes()`
-- Supports swappable assembler implementations via constructor injection
-
-**API Routes** (`src/api/routes.ts`):
-- Fastify route handlers
-- Endpoints: `/health`, `/sync/status`, `/sync/trigger`, `/notes`, `/notes/:id`, `/notes/search`, `/config`
-
-### Data Flow
-
-1. **Sync Process**:
-   - SyncService calls CouchDBClient.getAllDocuments()
-   - Documents are filtered (skip internal docs with `:`, skip deleted, require valid type)
-   - For each document, ChunkAssembler.assembleDocument() is called
-   - ChunkAssembler tries three strategies: direct data → eden cache → children chunks
-   - If encrypted, LiveSyncCrypto decrypts each chunk using HKDF
-   - Chunks are combined in order
-   - LiveSyncDocument → Note conversion
-   - Notes stored in memory (Map)
-
-2. **API Requests**:
-   - Client → Fastify routes → SyncService → ChunkAssembler → CouchDBClient → CouchDB
-
-3. **Encryption/Decryption Flow**:
-   - LiveSyncCrypto retrieves PBKDF2 salt from `_local/obsidian_livesync_sync_parameters`
-   - For each chunk, check if data starts with `%=` (HKDF encryption marker)
-   - If encrypted: call `octagonal-wheels/encryption/hkdf.decrypt(data, passphrase, salt)`
-   - If not encrypted: decode as base64
-   - Return decrypted/decoded plain text
-
-4. **Chunk Assembly Flow**:
-   - **Direct data**: Small files with `data` field → decrypt/decode directly
-   - **Eden cache**: Documents with `eden` object → sort by epoch, decrypt each chunk, combine
-   - **Children chunks**: Documents with `children` array → bulk fetch chunk docs (IDs like `h:+xxx`), decrypt each, combine in order
+For more details, refer to `docs` directory, especially `docs/Project-Struct.md` for architecture and design.
 
 ### Obsidian LiveSync Document Format
 
@@ -239,13 +160,6 @@ When writing tests:
 1. Modify `SyncService.processDocuments()` for document processing
 2. Update `LiveSyncDocument` or `Note` types if schema changes
 3. Consider impact on existing notes in memory
-
-### Adding AI Analysis (Future)
-
-1. Create new service: `src/services/ai-service.ts`
-2. Add AI provider configuration to `src/types/index.ts` and `src/utils/config.ts`
-3. Integrate with SyncService to analyze notes
-4. Add API endpoints in `src/api/routes.ts`
 
 ## Important Notes
 
