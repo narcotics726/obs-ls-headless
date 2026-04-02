@@ -36,7 +36,7 @@ export interface SyncStatus {
   lastSyncTime: Date | null;
   lastSyncSuccess: boolean;
   documentsCount: number;
-  lastSeq?: string;  // CouchDB sequence number for incremental sync
+  lastSeq?: string; // CouchDB sequence number for incremental sync
   error?: string;
 }
 
@@ -58,7 +58,7 @@ export interface SyncStatus {
 export interface LiveSyncDocument {
   _id: string;
   _rev?: string;
-  type?: 'newnote' | 'plain' | 'leaf' | 'chunkpack';
+  type?: "newnote" | "plain" | "leaf" | "chunkpack";
   path?: string;
 
   // Direct data storage (small files or chunk content)
@@ -83,7 +83,7 @@ export interface LiveSyncDocument {
  * Eden is an optimization that caches recent chunks directly in the metadata document
  */
 export interface EdenChunk {
-  data: string;  // Base64 encoded chunk data
+  data: string; // Base64 encoded chunk data
   epoch: number; // Ordering number for chunk sequence
 }
 
@@ -113,12 +113,14 @@ export interface Note {
  * Event bus related types to decouple core services and plugins.
  */
 export enum EventType {
-  SyncStarted = 'SyncStarted',
-  SyncCompleted = 'SyncCompleted',
-  SyncFailed = 'SyncFailed',
-  BackupTriggered = 'BackupTriggered',
-  BackupCompleted = 'BackupCompleted',
-  NoteIndexed = 'NoteIndexed',
+  SyncStarted = "SyncStarted",
+  SyncCompleted = "SyncCompleted",
+  SyncFailed = "SyncFailed",
+  BackupTriggered = "BackupTriggered",
+  BackupCompleted = "BackupCompleted",
+  NoteIndexed = "NoteIndexed",
+  NoteUpserted = "NoteUpserted",
+  NoteDeleted = "NoteDeleted",
 }
 
 export interface LiveSyncEvent {
@@ -127,6 +129,24 @@ export interface LiveSyncEvent {
   source: string;
   payload?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+}
+
+export interface NoteUpsertedPayload {
+  noteId: string;
+  path: string;
+  mtime: number;
+  contentHash: string;
+  syncMode: "full" | "incremental";
+  syncRunId: string;
+  lastSeq?: string;
+}
+
+export interface NoteDeletedPayload {
+  noteId: string;
+  path?: string;
+  syncMode: "full" | "incremental";
+  syncRunId: string;
+  lastSeq?: string;
 }
 
 export type EventListener = (event: LiveSyncEvent) => void | Promise<void>;
