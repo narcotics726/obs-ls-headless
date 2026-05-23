@@ -11,16 +11,26 @@ services:
     env_file:
       - ./.env
 
+  couchdb:
+    image: couchdb:3
+    container_name: couchdb
+    restart: unless-stopped
+    volumes:
+      - couchdb_data:/opt/couchdb/data
+      - couchdb_config:/opt/couchdb/etc/local.d
+
   caddy:
     image: caddy:2.10-alpine
     container_name: obs-ls-caddy
     depends_on:
       - obs-ls-headless
+      - couchdb
     restart: unless-stopped
     environment:
       - NO_PROXY=localhost,127.0.0.1,obs-ls-headless
     ports:
       - "8001:8001"
+      - "9002:9002"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -29,5 +39,7 @@ services:
 volumes:
   obs_state:
   obs_data:
+  couchdb_data:
+  couchdb_config:
   caddy_data:
   caddy_config:

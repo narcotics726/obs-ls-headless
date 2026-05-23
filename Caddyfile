@@ -9,3 +9,7 @@
 
 	reverse_proxy obs-ls-headless:8001
 }
+
+:9002 {
+	reverse_proxy couchdb:5984
+}
